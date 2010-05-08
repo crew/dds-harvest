@@ -1,0 +1,26 @@
+#!/usr/bin/python
+# DDS XMPP Server Executable.
+# 
+# ***** BEGIN LICENCE BLOCK *****
+# 
+# The Initial Developer of the Original Code is
+# The Northeastern University CCIS Volunteer Systems Group
+# 
+# Contributor(s):
+#   Alex Lee <lee@ccs.neu.edu>
+# 
+# ***** END LICENCE BLOCK *****
+
+# XXX Hide Deprecation warnings
+import warnings
+warnings.simplefilter('ignore', DeprecationWarning)
+
+import sys
+import gflags as flags
+from dds_server import main
+
+FLAGS = flags.FLAGS
+
+if __name__ == '__main__':
+    FLAGS(sys.argv)
+    main.main()
