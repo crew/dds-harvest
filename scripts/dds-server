@@ -17,10 +17,10 @@ warnings.simplefilter('ignore', DeprecationWarning)
 
 import sys
 import gflags as flags
-from dds_server import main
+from harvest.main import main
 
 FLAGS = flags.FLAGS
 
 if __name__ == '__main__':
     FLAGS(sys.argv)
-    main.main()
+    main()
