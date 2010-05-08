@@ -15,7 +15,11 @@ class Combine(threading.Thread):
     def __init__(self, jabber, timeout=2, **kwargs):
         self.jabber = jabber
         self.timeout = 2
+        self.event = threading.Event()
         super(self.__class__, self).__init__(**kwargs)
+
+    def die(self):
+        self.event.set()
 
     def collect(self):
         logging.debug('Running message collection')
@@ -90,6 +94,6 @@ class Combine(threading.Thread):
         logging.info('Done.')
 
     def run(self):
-        while True:
+        while not self.event.is_set():
             self.collect()
             time.sleep(self.timeout)

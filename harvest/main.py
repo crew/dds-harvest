@@ -10,6 +10,8 @@
 # ***** END LICENCE BLOCK *****
 import os
 import sys
+import time
+import signal
 import logging
 import threading
 import xmpp
@@ -22,7 +24,7 @@ flags.DEFINE_string('config_section', 'DEFAULT',
                     'Configuration file section to parse')
 flags.DEFINE_string('log_file', None, 'Log file path')
 flags.DEFINE_boolean('debug', False, 'Enable debugging')
-flags.DEFINE_boolean('daemonize', False, 'Enable Daemon Mode')
+flags.DEFINE_boolean('daemonize', True, 'Enable Daemon Mode')
 flags.DEFINE_string('dds_path', '/', 'Path to the dds module.')
 FLAGS = flags.FLAGS
 
@@ -132,7 +134,9 @@ class MainThread(threading.Thread):
                 pass
         except KeyboardInterrupt:
             logging.debug('Shutting down.')
-            sys.exit(0)
+            combine.die()
+            combine.join()
+            return
 
 def main():
     options = get_options()
@@ -146,6 +150,17 @@ def main():
                         format='%(asctime)s %(filename)s %(lineno)s '
                                '%(levelname)s %(message)s')
 
-    mt = MainThread(*options)
-    mt.start()
-    mt.join()
+    while True:
+        pid = os.fork()
+        if pid == 0:
+            logging.info('Starting main thread')
+            mt = MainThread(*options)
+            mt.run()
+            return
+        elif pid > 0:
+            logging.info('sleeping for 30')
+            time.sleep(30)
+            os.kill(pid, signal.SIGINT)
+            os.waitpid(pid, 0)
+        else:
+            sys.exit(1)
