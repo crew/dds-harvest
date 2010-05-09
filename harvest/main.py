@@ -28,49 +28,41 @@ flags.DEFINE_boolean('daemonize', True, 'Enable Daemon Mode')
 flags.DEFINE_string('dds_path', '/', 'Path to the dds module.')
 FLAGS = flags.FLAGS
 
+LOGFORMAT = '%(asctime)s %(levelname)s %(filename)s %(lineno)s %(message)s'
+
 
 def parse_config():
     import ConfigParser
     config = ConfigParser.RawConfigParser()
     config.read(FLAGS.config_file)
-    return [config.get(FLAGS.config_section, 'username'),
-            config.get(FLAGS.config_section, 'password'),
-            config.get(FLAGS.config_section, 'resource'),
-            config.get(FLAGS.config_section, 'server'),
-            config.getboolean(FLAGS.config_section, 'debug'),
-            config.get(FLAGS.config_section, 'dds-path'),
-            config.get(FLAGS.config_section, 'log')]
+    return {
+        'username': config.get(FLAGS.config_section, 'username'),
+        'password': config.get(FLAGS.config_section, 'password'),
+        'resource': config.get(FLAGS.config_section, 'resource'),
+        'server': config.get(FLAGS.config_section, 'server'),
+        'debug': config.getboolean(FLAGS.config_section, 'debug'),
+        'path': config.get(FLAGS.config_section, 'dds-path'),
+        'log-file': config.get(FLAGS.config_section, 'log'),
+    }
 
 
 def get_options():
-    all_list = parse_config()
-
+    options = parse_config()
     # Sync up.
     if FLAGS.debug:
-        all_list[4] = FLAGS.debug
+        options['debug'] = FLAGS.debug
     if FLAGS.dds_path != '/':
-        all_list[5] = FLAGS.dds_path
+        options['path'] = FLAGS.dds_path
     if FLAGS.log_file:
-        all_list[6] = FLAGS.log_file
-
-    return all_list
-
-
-def alive(dispatch):
-    try:
-        dispatch.Process(1)
-    except Exception, e:
-        logging.error('%s', e)
-        logging.info('Connection closed.')
-        return False
-    return True
+        options['log-file'] = FLAGS.log_file
+    return options
 
 
 class MainThread(threading.Thread):
 
-    def __init__(self, username, password, resource, server, debug, path,
-                 *args, **kwargs):
-        threading.Thread.__init__(self, *args, **kwargs)
+    def __init__(self, username=None, password=None, resource=None,
+                 server=None, debug=None, path=None, **kwargs):
+        threading.Thread.__init__(self, **kwargs)
         self.username = username
         self.password = password
         self.resource = resource
@@ -79,34 +71,44 @@ class MainThread(threading.Thread):
         self.path = path
 
     def get_client(self):
-        server = self.server
         if self.debug:
-            return xmpp.Client(server=server)
+            return xmpp.Client(server=self.server)
         else:
-            return xmpp.Client(server=server, debug=[])
+            return xmpp.Client(server=self.server, debug=[])
 
     def connect_client(self, client):
         try:
             client.connect()
+            return True
         except:
-            logging.debug('Connecting to server failed.')
-            sys.exit(2)
+            logging.info('Connecting to %s failed.', self.server)
+        return False
 
     def auth_client(self, client):
         try:
             client.auth(self.username, self.password, self.resource,
                         sasl=False)
+            return True
         except:
-            logging.debug('Authorization failed.')
-            sys.exit(3)
+            logging.info('Authorization failed for: %s', self.username)
+        return False
 
     def register_handlers(self, client, handler):
         client.RegisterHandler('presence', handler.presence_handle)
         client.RegisterHandler('iq', handler.iq_handle, ns=xmpp.NS_RPC)
         client.sendInitPresence()
+        return True
+
+    def alive(self, client):
+        try:
+            client.Process(1)
+        except Exception, e:
+            logging.error(e)
+            logging.debug('Connection closed.')
+            return False
+        return True
 
     def run(self):
-        logging.info('path: %s', self.path)
         # Delayed import because the path is not set before this point.
         sys.path.insert(0, self.path)
         try:
@@ -116,51 +118,67 @@ class MainThread(threading.Thread):
         except ImportError:
             logging.critical('The path to DDS is not set.')
             sys.stderr.write('The dds module is not found.\n')
-            sys.exit(1)
+            return
 
         client = self.get_client()
-        self.connect_client(client)
-        self.auth_client(client)
-        self.register_handlers(client, handler)
+        if not (self.connect_client(client) and
+                self.auth_client(client) and
+                self.register_handlers(client, handler)):
+            return
 
-        logging.info('Connection started')
+        logging.debug('Connection started')
 
         combine = Combine(client, timeout=10)
         combine.daemon = True
         combine.start() # wrrrrrrr
 
         try:
-            while alive(client):
+            while self.alive(client):
                 pass
-        except KeyboardInterrupt:
+        except KeyboardInterrupt: # SIGINT
             logging.debug('Shutting down.')
             combine.die()
             combine.join()
             return
 
-def main():
+
+def main(interval=30):
     options = get_options()
-    log = options[6]
-    options = options[:6]
+
+    logging.basicConfig(level=logging.DEBUG, filemode='a', format=LOGFORMAT,
+                        filename=options.pop('log-file'))
 
     if FLAGS.daemonize:
         daemonize()
 
-    logging.basicConfig(level=logging.DEBUG, filename=log, filemode='a',
-                        format='%(asctime)s %(filename)s %(lineno)s '
-                               '%(levelname)s %(message)s')
+    # mask the password for logging
+    options_copy = dict(options)
+    options_copy['password'] = '********'
+    logging.info(options_copy)
 
+    # Restart every <interval> seconds
     while True:
         pid = os.fork()
         if pid == 0:
-            logging.info('Starting main thread')
-            mt = MainThread(*options)
-            mt.run()
+            # in the child
+            # run the main thread
+            logging.debug('Starting main thread')
+            mt = MainThread(**options)
+            mt.daemon = True
+            mt.start()
+            mt.join()
             return
         elif pid > 0:
-            logging.info('sleeping for 30')
-            time.sleep(30)
+            # in the parent
+            # sleep for the interval, then kill the child
+            logging.debug('Sleeping for %d', interval)
+            time.sleep(interval)
+            # use SIGINT first, then SIGKILL
             os.kill(pid, signal.SIGINT)
+            time.sleep(0.5)
+            os.kill(pid, signal.SIGKILL)
+            # reap the child (lest there be zombies)
             os.waitpid(pid, 0)
         else:
+            # oh crap, we can't fork.
             sys.exit(1)
