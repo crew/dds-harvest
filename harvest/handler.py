@@ -21,6 +21,10 @@ import dblayer
 from dblayer import generate_request
 
 
+PLAYLIST_REQUEST_STATUS = 'playlistrequest'
+PLAYLIST_SET = 'setPlaylist'
+
+
 class DDSHandler(object):
 
     def presence_handle(self, dispatch, pr):
@@ -32,38 +36,46 @@ class DDSHandler(object):
             logging.debug('Skipping message from self')
             return
         typ = pr.getType()
-        logging.debug('%s : got presence. %s' % (jid, jidto))
+        logging.debug('%s : got presence. %s', jid, jidto)
 
         client = None
 
-        logging.debug('%s : looking for client in the database.' % jid)
+        logging.debug('%s : looking for client in the database.', jid)
         jid_stripped = jid.getStripped()
         client, client_created = dblayer.get_client(jid_stripped)
         activity, activity_created = dblayer.get_activity(jid_stripped)
 
         if client_created:
-            logging.debug('%s : registered previously unseen client' % jid)
+            logging.info('%s : registered previously unseen client', jid)
         if activity_created:
             logging.info('No client activity for this client')
             self.presence_handle(dispatch, pr)
 
         if client:
-            if (pr.getStatus() == 'playlistrequest'):
-                self.send_playlist(dispatch, jid, client.playlist)
-            ca = client.activity
-            ca.active = (typ != 'unavailable')
-            ca.current_slide = dblayer.get_slide(pr.getStatus())
-            ca.save()
-            if not ca.active:
-                logging.info('%s : has gone offline.' % jid)
+            self.handle_client(dispatch, pr, client)
         raise xmpp.NodeProcessed
+
+    def handle_client(self, dispatch, pr, client):
+        """Handle client activity"""
+        jid = pr.getFrom()
+        if pr.getStatus() == PLAYLIST_REQUEST_STATUS:
+            self.send_playlist(dispatch, jid, client.playlist)
+        ca = client.activity
+        ca.active = (pr.getType() != 'unavailable')
+        ca.current_slide = dblayer.get_slide(pr.getStatus())
+        if not ca.active:
+            logging.info('%s : has gone offline.', jid)
+        try:
+            ca.save()
+        except Exception, e:
+            logging.error(e)
 
     def iq_handle(self, dispatch, iq):
         jid = iq.getFrom()
         iq_type = iq.getType()
         ns = iq.getQueryNS()
 
-        logging.debug('%s : got IQ' % jid)
+        logging.debug('%s : got IQ', jid)
         if not jid:
             logging.debug('No jid')
             raise xmpp.NodeProcessed
@@ -77,21 +89,18 @@ class DDSHandler(object):
                     self.get_slide(dispatch, iq)
                 except Exception, e:
                     self.send_error(dispatch, jid)
-                    logging.error('%s : %s' % (jid, e))
+                    logging.error('%s : %s', jid, e)
 
             raise xmpp.NodeProcessed
 
     def send_playlist(self, dispatch, jid, playlist):
         """Sends the initial slides to the Jabber id."""
-        logging.info('%s : sending playlist' % jid)
+        logging.info('%s : sending playlist', jid)
         packet = playlist.packet()
-        packet['slides'] = []
-        for slide in playlist.slides():
-            packet['slides'].append(slide.parse())
-        request = generate_request((packet,),
-                                   methodname='setPlaylist')
+        packet['slides'] = [slide.parse() for slide in playlist.slides()]
+        request = generate_request((packet,), methodname=PLAYLIST_SET)
         dispatch.send(self.get_iq(jid, 'set', request))
-        logging.info('%s : sent playlist' % jid)
+        logging.info('%s : sent playlist', jid)
 
     @classmethod
     def get_iq(cls, jid, typ, request):
@@ -102,7 +111,7 @@ class DDSHandler(object):
 
     def send_error(self, dispatch, jid, payload=('error', )):
         """Sends an error."""
-        logging.info('%s : sending error' % jid)
+        logging.info('%s : sending error', jid)
         request = generate_request(payload)
         dispatch.send(self.get_iq(jid, 'error', request))
-        logging.info('%s : sent error' % jid)
+        logging.info('%s : sent error', jid)

@@ -14,7 +14,7 @@ class Combine(threading.Thread):
 
     def __init__(self, jabber, timeout=2, **kwargs):
         self.jabber = jabber
-        self.timeout = 2
+        self.timeout = timeout
         self.event = threading.Event()
         super(self.__class__, self).__init__(**kwargs)
 
@@ -65,7 +65,7 @@ class Combine(threading.Thread):
         if obj['method'] == 'playlist':
             self.send_playlist(message, obj)
             return
-        elif obj['method'] == 'displaycontrol' or obj['method'] == 'killDDS':
+        elif obj['method'] in ('displaycontrol', 'killDDS'):
             self.send_displaycontrol(message, obj)
             return
         # Get the slide.
@@ -77,6 +77,7 @@ class Combine(threading.Thread):
             tos = [c.jid() for c in slide.all_clients()]
         if slide is None:
             # Mocking.
+            # XXX
             slide = object()
             slide.pk = obj['slide']
             slide.parse = lambda: slide.pk
