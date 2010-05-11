@@ -16,7 +16,7 @@ import warnings
 warnings.simplefilter('ignore', DeprecationWarning)
 
 import sys
-import gflags as flags
+from harvest import gflags as flags
 from harvest import main
 
 FLAGS = flags.FLAGS
