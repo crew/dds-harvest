@@ -1,3 +1,57 @@
-De-coupling the dds-server portion of the backend.
+Prereqs
+=======
+- Python 2.4+
+- python-pip
+- python-setuptools
 
--Alex
+Setup
+=====
+in the this directory, run
+
+  sudo pip install -r requirements.txt
+
+That'll download the right versions of software harvest depends on.
+Run
+
+  sudo ./setup.py install
+
+That'll install harvest as a command 'dds-server' on your machine.
+It'll also install harvest's configuration file to
+'/etc/dds-server.conf'. Edit it and replace
+
+  username: test2
+  password: test2
+
+with a username and password you've already set up on the xmpp
+server you'll be using. The default server is dds-master.ccs.neu.edu.
+If you haven't already, you should set up an account there.
+Any decent xmpp client, like pidgin or adium should be able to
+do that, if you give it the name of the server. Replace
+
+  dds-path: /
+
+with
+
+  dds-path: /full/path/to/backend
+
+that is, replace '/' with the absolute path to your checkout
+of orwell. Harvest depends on code and configuration files
+from orwell, specifically the database configuration. It's
+important that in your 'local_settings.py' file in orwell, if
+you use sqlite3, the DATABASE_NAME variable is a full path
+to the database file orwell uses. If it's just a name, like
+for instance 'orwell.db', harvest will create a database itself
+in this directory. The database will be unpopulated of course, so
+it'll die on startup.
+
+Running
+=======
+Make sure orwell has already been set up and is running. Run
+
+  dds-server
+
+The harvest process will detach from your shell and run on
+its own. If you'd like to have it attached to your shell and
+display logging information, run
+
+  dds-server --nodaemonize
