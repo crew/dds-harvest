@@ -86,11 +86,15 @@ class MainThread(threading.Thread):
 
     def auth_client(self, client):
         try:
-            client.auth(self.username, self.password, self.resource,
-                        sasl=False)
+            logging.info('Authenticating %s...', self.username)
+            auth = client.auth(self.username, self.password, self.resource,
+                               sasl=False)
+            if not auth:
+                logging.info('Auth may have failed for %s.', self.username)
+                return False
             return True
         except:
-            logging.info('Authorization failed for: %s', self.username)
+            logging.info('Authentication failed for %s.', self.username)
         return False
 
     def register_handlers(self, client, handler):
@@ -108,6 +112,25 @@ class MainThread(threading.Thread):
             return False
         return True
 
+    def SetupXmpp(self):
+        client = self.get_client()
+        if not self.connect_client(client):
+            return False
+        auth = self.auth_client(client)
+        if not auth:
+            logging.warning('Unrecognized XMPP account: %s ! Attempting registration...', self.username)
+            ident = {"username": self.username, "password": self.password}
+            if not xmpp.features.register(client, self.server, ident):
+                logging.error('XMPP New Account registration failed. Bailing out!')
+                os.abort()
+                return False
+            else:
+                logging.info('Registered %s.  Restarting setup...', self.username)
+                # At this point, we have created a new XMPP account, and need to restart
+                # the setup process.
+                return self.SetupXmpp()
+        return client
+
     def run(self):
         # Delayed import because the path is not set before this point.
         sys.path.insert(0, self.path)
@@ -120,10 +143,10 @@ class MainThread(threading.Thread):
             sys.stderr.write('The dds module is not found.\n')
             return
 
-        client = self.get_client()
-        if not (self.connect_client(client) and
-                self.auth_client(client) and
-                self.register_handlers(client, handler)):
+        client = self.SetupXmpp()
+        if not client:
+            return
+        if not self.register_handlers(client, handler):
             return
 
         logging.debug('Connection started')
