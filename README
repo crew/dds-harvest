@@ -22,11 +22,10 @@ It'll also install harvest's configuration file to
   username: test2
   password: test2
 
-with a username and password you've already set up on the xmpp
-server you'll be using. The default server is dds-master.ccs.neu.edu.
-If you haven't already, you should set up an account there.
-Any decent xmpp client, like pidgin or adium should be able to
-do that, if you give it the name of the server. Replace
+with a username and password for the the xmpp server you'll
+be using. The default server is dds-master.ccs.neu.edu.
+If you haven't already, set up an account there, harvest will
+automatically create your account on the server. Replace
 
   dds-path: /
 
