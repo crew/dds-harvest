@@ -16,7 +16,6 @@ import logging
 import threading
 import xmpp
 import gflags as flags
-from daemonize import daemonize
 
 flags.DEFINE_string('config_file', '/etc/dds-server.conf',
                     'Path to the configuration file')
@@ -24,7 +23,6 @@ flags.DEFINE_string('config_section', 'DEFAULT',
                     'Configuration file section to parse')
 flags.DEFINE_string('log_file', None, 'Log file path')
 flags.DEFINE_boolean('debug', False, 'Enable debugging')
-flags.DEFINE_boolean('daemonize', True, 'Enable Daemon Mode')
 flags.DEFINE_string('dds_path', '/', 'Path to the dds module.')
 FLAGS = flags.FLAGS
 
@@ -170,9 +168,6 @@ def main(interval=30):
 
     logging.basicConfig(level=logging.DEBUG, filemode='a', format=LOGFORMAT,
                         filename=options.pop('log-file'))
-
-    if FLAGS.daemonize:
-        daemonize()
 
     # mask the password for logging
     options_copy = dict(options)
