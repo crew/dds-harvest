@@ -47,7 +47,7 @@ def init():
               'server': config.get(FLAGS.config_section, 'server'),
               'debug': config.getboolean(FLAGS.config_section, 'debug'),
               'path': config.get(FLAGS.config_section, 'dds-path'),
-              'log-file': config.get(FLAGS.config_section, 'log') }
+              'log_file': config.get(FLAGS.config_section, 'log') }
   if FLAGS.debug:
       OPTIONS['debug'] = FLAGS.debug
   if FLAGS.dds_path != '/':
