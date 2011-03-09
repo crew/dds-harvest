@@ -43,6 +43,13 @@ for instance 'orwell.db', harvest will create a database itself
 in this directory. The database will be unpopulated of course, so
 it'll die on startup.
 
+Finally, if you wish for dds-backend to start with your machine
+ensure that you run
+
+    update-rc.d harvest defaults
+
+to add the init script to your initrc
+
 Running
 =======
 Make sure orwell has already been set up and is running. Run

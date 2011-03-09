@@ -24,5 +24,6 @@ setup(
     platforms = ['linux'],
     scripts = ['scripts/dds-server'],
     packages = ['harvest'],
-    data_files = [('/etc', ['cfg/dds-server.conf']),],
+    data_files = [('/etc', ['cfg/dds-server.conf']),
+        ('/etc/init.d', ['cfg/harvest'])]
 )
